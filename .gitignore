@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# venvs
+.venv/
+.env
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Dev data
+data/
+*.sqlite
+*.db
+
+# IDE
+.vscode/
+.idea/
+.DS_Store

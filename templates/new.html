@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}new scan · maigret-runner{% endblock %}
+{% block body %}
+<section class="flex items-center justify-between mb-6">
+  <h2 class="lbl">new scan</h2>
+  <a href="/" class="badge bg-muted/15 text-muted hover:bg-muted/25">cancel</a>
+</section>
+
+<form method="post" action="/" class="card p-6 space-y-5">
+  <label class="block">
+    <span class="lbl block mb-2">username to investigate</span>
+    <input
+      type="text"
+      name="username"
+      autofocus
+      required
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+      pattern="[A-Za-z0-9._\-]{1,64}"
+      class="w-full bg-surface border border-white/10 rounded-md px-3 py-2 text-fg font-mono focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+      placeholder="e.g. soxoj" />
+    <p class="text-xs text-muted mt-2">
+      letters, digits, dots, underscores, hyphens. case-insensitive on most sites.
+    </p>
+  </label>
+
+  <div class="flex items-center justify-between pt-2">
+    <p class="text-xs text-muted">
+      scans ~500 sites; usually finishes in 1-5 minutes.
+    </p>
+    <button
+      type="submit"
+      class="bg-accent text-bg font-medium px-4 py-2 rounded-md hover:bg-accent2 transition">
+      start scan
+    </button>
+  </div>
+</form>
+{% endblock %}

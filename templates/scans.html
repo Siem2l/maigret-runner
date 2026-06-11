@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}scans · maigret-runner{% endblock %}
+{% block body %}
+<section class="flex items-center justify-between mb-6">
+  <h2 class="lbl">past scans</h2>
+  <a href="/new" class="badge bg-accent/20 text-accent hover:bg-accent/30">+ new scan</a>
+</section>
+
+{% if not jobs %}
+  <div class="card px-6 py-10 text-center text-muted">
+    <p>no scans yet. <a href="/new" class="text-accent hover:underline">start one →</a></p>
+  </div>
+{% else %}
+  <ul class="space-y-2">
+    {% for j in jobs %}
+      <li class="card px-4 py-3 hover:border-accent/40 transition">
+        <a href="/scans/{{ j.id }}" class="flex items-center gap-4">
+          <span class="font-mono text-accent w-48 truncate">{{ j.username }}</span>
+          <span class="lbl flex-1 text-left truncate">{{ j.started_at[:19].replace('T',' ') }}</span>
+          {% if j.status == 'done' %}
+            <span class="badge bg-ok/15 text-ok">{{ j.sites_found }} / {{ j.sites_checked }}</span>
+          {% elif j.status == 'failed' %}
+            <span class="badge bg-danger/15 text-danger">failed</span>
+          {% elif j.status == 'running' %}
+            <span class="badge bg-accent/15 text-accent animate-pulse">running</span>
+          {% else %}
+            <span class="badge bg-muted/15 text-muted">queued</span>
+          {% endif %}
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

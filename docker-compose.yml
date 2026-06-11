@@ -1,0 +1,65 @@
+# Local dev: spin up maigret-runner + flaresolverr + a throwaway minio
+# so `docker compose up` is enough to smoke-test the full chain without
+# touching the production Garage instance.
+#
+# Production deployment uses the apis-mellifera Nix module, NOT this file.
+
+services:
+  app:
+    build: .
+    image: ghcr.io/siem2l/maigret-runner:dev
+    ports:
+      - "8080:8080"
+    environment:
+      DATA_DIR: /data
+      PUBLIC_HOST: localhost:8080
+
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_BUCKET: maigret-reports
+      S3_REGION: dev
+      AWS_ACCESS_KEY_ID: dev
+      AWS_SECRET_ACCESS_KEY: devdevdev
+
+      FLARESOLVERR_URL: http://flaresolverr:8191/v1
+      MAIGRET_TOP_SITES: "100"
+    volumes:
+      - ./data:/data
+    depends_on:
+      minio-bucket:
+        condition: service_completed_successfully
+      flaresolverr:
+        condition: service_started
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:v3.5.0
+    environment:
+      LOG_LEVEL: info
+      PROMETHEUS_ENABLED: "true"
+      PROMETHEUS_PORT: "8192"
+      TZ: Europe/Amsterdam
+    ports:
+      - "8191:8191"
+      - "8192:8192"
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: dev
+      MINIO_ROOT_PASSWORD: devdevdev
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  # Idempotent one-shot that creates the dev bucket so the app boots
+  # without a "NoSuchBucket" face-plant on the first put_object call.
+  minio-bucket:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      sh -c "
+        mc alias set local http://minio:9000 dev devdevdev &&
+        mc mb --ignore-existing local/maigret-reports &&
+        echo bucket ready
+      "

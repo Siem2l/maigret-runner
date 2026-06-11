@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ job.username }} · maigret-runner{% endblock %}
+{% block body %}
+<section class="flex items-center justify-between mb-6">
+  <div>
+    <h2 class="text-xl font-medium text-fg/90">{{ job.username }}</h2>
+    <p class="lbl mt-1">started {{ job.started_at[:19].replace('T',' ') }} · id {{ job.id[:8] }}</p>
+  </div>
+  <a href="/" class="badge bg-muted/15 text-muted hover:bg-muted/25">← all scans</a>
+</section>
+
+<div class="card p-5 mb-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+  <div>
+    <div class="lbl">status</div>
+    <div class="mt-1 font-mono
+      {% if job.status == 'done' %}text-ok{% elif job.status == 'failed' %}text-danger{% elif job.status == 'running' %}text-accent animate-pulse{% else %}text-muted{% endif %}">
+      {{ job.status }}
+    </div>
+  </div>
+  <div>
+    <div class="lbl">sites checked</div>
+    <div class="mt-1 font-mono">{{ job.sites_checked }}</div>
+  </div>
+  <div>
+    <div class="lbl">hits found</div>
+    <div class="mt-1 font-mono text-accent">{{ job.sites_found }}</div>
+  </div>
+  <div>
+    <div class="lbl">finished</div>
+    <div class="mt-1 font-mono">{{ (job.finished_at or '—')[:19].replace('T',' ') }}</div>
+  </div>
+</div>
+
+{% if job.status == 'done' %}
+  <div class="card overflow-hidden">
+    <div class="px-4 py-2 border-b border-white/5 flex items-center justify-between">
+      <span class="lbl">maigret html report</span>
+      <a href="/api/scans/{{ job.id }}/html" target="_blank"
+         class="badge bg-accent/15 text-accent hover:bg-accent/25">open in new tab ↗</a>
+    </div>
+    <iframe src="/api/scans/{{ job.id }}/html"
+            class="w-full h-[70vh] bg-white"
+            sandbox="allow-same-origin allow-popups"></iframe>
+  </div>
+{% elif job.status == 'failed' %}
+  <div class="card p-5 border-danger/40">
+    <div class="lbl text-danger mb-2">error</div>
+    <pre class="font-mono text-xs whitespace-pre-wrap text-fg/80">{{ job.error or '(no detail)' }}</pre>
+  </div>
+{% else %}
+  <div class="card p-5 text-center text-muted">
+    <p>scan {{ job.status }}. this page auto-refreshes.</p>
+    <meta http-equiv="refresh" content="6" />
+  </div>
+{% endif %}
+{% endblock %}

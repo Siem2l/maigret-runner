@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}maigret-runner{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bg:        '#1d2021',
+            surface:   '#282828',
+            surface2:  '#32302f',
+            fg:        '#ebdbb2',
+            muted:     '#a89984',
+            label:     '#9a948a',
+            accent:    '#fabd2f',
+            accent2:   '#fe8019',
+            danger:    '#fb4934',
+            ok:        '#b8bb26',
+          },
+          fontFamily: {
+            sans:  ['Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'],
+            mono:  ['ui-monospace', 'Menlo', 'SF Mono', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body { background: #1d2021; }
+    .card {
+      background: rgba(30,33,35,0.72);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+    }
+    .badge { @apply text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full; }
+    .lbl   { @apply text-[12px] font-mono uppercase tracking-widest text-label; }
+  </style>
+</head>
+<body class="font-sans text-fg min-h-screen">
+  <header class="max-w-5xl mx-auto px-6 pt-8 pb-4 flex items-end justify-between border-b border-white/5">
+    <div>
+      <h1 class="text-2xl font-medium tracking-tight text-fg/90">maigret</h1>
+      <p class="font-mono text-xs tracking-wide text-muted mt-1">OSINT username scanner · apis-mellifera</p>
+    </div>
+    <nav class="flex gap-4 text-sm">
+      <a href="/" class="hover:text-accent">scans</a>
+      <a href="/new" class="hover:text-accent">new scan</a>
+    </nav>
+  </header>
+  <main class="max-w-5xl mx-auto px-6 py-8">
+    {% block body %}{% endblock %}
+  </main>
+  <footer class="max-w-5xl mx-auto px-6 py-6 text-center text-[11px] font-mono text-label/70 border-t border-white/5 mt-12">
+    apis-mellifera · maigret-runner · nix flake managing the hive
+  </footer>
+</body>
+</html>
