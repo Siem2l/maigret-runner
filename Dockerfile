@@ -26,7 +26,10 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
     cp /root/.local/bin/uv /usr/local/bin/uv
 
 WORKDIR /app
-COPY pyproject.toml ./
+# hatchling reads README.md + LICENSE during package metadata
+# resolution (pyproject.toml's `readme = "README.md"` and the license
+# table); copy all three so `uv pip install .` doesn't ENOENT.
+COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 
 # Resolve deps + install into a venv under /opt/venv. We let uv build
