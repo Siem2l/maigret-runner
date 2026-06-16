@@ -88,20 +88,22 @@ async def _run(job_id: str, username: str) -> None:
 async def _run_maigret(username: str) -> tuple[bytes, dict[str, Any]]:
     """Invoke Maigret as a library and return (html_bytes, results_dict).
 
-    Maigret is async-first internally — `search` returns a coroutine
-    that yields per-site results. The library also provides
-    `generate_report_context` + an HTML template renderer, which is
-    what the CLI uses for `--html`. We call those directly so the whole
-    flow stays inside one process.
+    The public scan function in upstream Maigret is `maigret.maigret.maigret`
+    (async), NOT `search` -- the CLI's `main()` calls it as
+    `await maigret(...)` and accumulates results into a list of
+    `(username, id_type, results)` tuples before passing them to
+    `generate_report_context` + `save_html_report`. We replicate the
+    same shape for a single-username scan.
     """
     # Lazy import: maigret pulls in a lot of stuff at module load
     # (aiohttp, mock_db, etc.) — keep the import out of cold-start path.
-    from maigret.maigret import search  # type: ignore[import-not-found]
-    from maigret.report import (  # type: ignore[import-not-found]
+    from maigret.maigret import (  # type: ignore[import-not-found]
         generate_report_context,
+        maigret as maigret_search,
         save_html_report,
     )
     from maigret.sites import MaigretDatabase  # type: ignore[import-not-found]
+    import logging as _logging
     import tempfile
     from pathlib import Path
 
@@ -109,16 +111,25 @@ async def _run_maigret(username: str) -> tuple[bytes, dict[str, Any]]:
     sites = db.ranked_sites_dict(top=settings.maigret_top_sites)
 
     log.info("maigret search start username=%s sites=%d", username, len(sites))
-    results = await search(
+    # Upstream's maigret() takes a logger as a required positional arg.
+    # Reuse our existing module logger with a child namespace so the
+    # library's debug spew lands in the same uvicorn log stream.
+    lib_logger = _logging.getLogger("maigret.lib")
+    results = await maigret_search(
         username=username,
         site_dict=sites,
+        logger=lib_logger,
         timeout=settings.maigret_timeout_per_site,
         is_parsing_enabled=False,
         id_type="username",
         debug=False,
+        no_progressbar=True,  # we're headless; the TTY progressbar trashes the log
     )
 
-    context = generate_report_context({username: {"username": username, "results": results}})
+    # generate_report_context expects a list of (username, id_type, results)
+    # tuples even when there's only one username -- mirrors how main()
+    # accumulates them (maigret.py:855).
+    context = generate_report_context([(username, "username", results)])
     with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmp:
         save_html_report(tmp.name, context)
         html_bytes = Path(tmp.name).read_bytes()
