@@ -145,30 +145,45 @@ def _resolve_sites_db_path() -> str:
     return str(pkg_dir / "resources" / "data.json")
 
 
-def _is_hit(site_data: dict[str, Any]) -> bool:
-    """Maigret reports a status object per site; only `Claimed` is a real
-    'username exists here' hit. The others are noise (Unknown, Available)."""
-    status = site_data.get("status", {})
-    return getattr(status, "status", None) == "Claimed" or (
-        isinstance(status, dict) and status.get("status") == "Claimed"
-    )
+def _status_string(site_data: Any) -> str | None:
+    """Walk site_data['status'] → MaigretCheckResult.status → MaigretCheckStatus
+    and return its human string ('Claimed', 'Available', 'Unknown', 'Illegal').
+    Returns None if the chain doesn't resolve (e.g. the scan errored before
+    the site was checked)."""
+    if not isinstance(site_data, dict):
+        return None
+    check_result = site_data.get("status")
+    if check_result is None:
+        return None
+    inner_status = getattr(check_result, "status", None)
+    # MaigretCheckStatus is a str enum: `.value` yields the human string,
+    # str() falls back to 'MaigretCheckStatus.X' which is no good.
+    return getattr(inner_status, "value", None)
+
+
+def _is_hit(site_data: Any) -> bool:
+    """Maigret reports a status object per site; only 'Claimed' is a
+    real 'username exists here' hit. The others are noise (Available =
+    handle is free, Unknown = the checker couldn't decide, Illegal =
+    the username violates the site's rules)."""
+    return _status_string(site_data) == "Claimed"
 
 
 def _trim_results(results: dict[str, Any]) -> dict[str, Any]:
-    """The full Maigret results dict embeds full HTML response bodies
-    per site — we already saved the rendered report, so for the JSON
-    sidecar drop the bulkiest fields. The list view only needs
-    site URL + status + a thumb-size summary."""
-    trimmed = {}
+    """Collapse the full Maigret results dict to JSON-safe primitives.
+    Upstream embeds live objects per site (MaigretSite, aiohttp checker,
+    MaigretCheckResult); none of those serialize. We keep only the
+    scalar fields the dashboard's list view needs — the rendered HTML
+    report is the source of truth for everything else."""
+    trimmed: dict[str, Any] = {}
     for site, data in results.items():
-        status = data.get("status", {})
-        status_dict = (
-            status if isinstance(status, dict) else {"status": getattr(status, "status", None)}
-        )
+        if not isinstance(data, dict):
+            continue
         trimmed[site] = {
             "url_user": data.get("url_user"),
             "url_main": data.get("url_main"),
-            "status": status_dict,
+            "http_status": data.get("http_status"),
+            "status": _status_string(data),
         }
     return trimmed
 
