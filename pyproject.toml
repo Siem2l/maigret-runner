@@ -1,6 +1,6 @@
 [project]
 name = "maigret-runner"
-version = "0.1.2"
+version = "0.1.3"
 description = "A small self-hosted web app wrapping Maigret with FlareSolverr-backed fetches and Garage S3 report storage."
 readme = "README.md"
 license = { text = "MIT" }

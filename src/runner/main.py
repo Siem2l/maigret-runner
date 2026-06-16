@@ -64,17 +64,22 @@ app = FastAPI(
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> Response:
     rows = await storage.list_jobs()
+    # Starlette ≥0.40 requires `request` as the first positional arg and
+    # forbids it inside the context dict (which now gets hashed for
+    # cache keys, and dicts aren't hashable). We follow the new API.
     return templates.TemplateResponse(
+        request,
         "scans.html",
-        {"request": request, "jobs": rows, "public_host": settings.public_host},
+        {"jobs": rows, "public_host": settings.public_host},
     )
 
 
 @app.get("/new", response_class=HTMLResponse)
 async def new_form(request: Request) -> Response:
     return templates.TemplateResponse(
+        request,
         "new.html",
-        {"request": request, "public_host": settings.public_host},
+        {"public_host": settings.public_host},
     )
 
 
@@ -96,8 +101,9 @@ async def detail(request: Request, job_id: str) -> Response:
     if row is None:
         raise HTTPException(status_code=404, detail="not found")
     return templates.TemplateResponse(
+        request,
         "detail.html",
-        {"request": request, "job": row, "public_host": settings.public_host},
+        {"job": row, "public_host": settings.public_host},
     )
 
 
