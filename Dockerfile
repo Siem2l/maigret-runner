@@ -20,6 +20,12 @@ RUN apt-get update \
         ca-certificates \
         curl \
         git \
+        # pycairo (transitive of xhtml2pdf) compiles a C extension that
+        # needs the cairo headers + pkg-config to locate them. Without
+        # these the wheel build face-plants with
+        # "Dependency lookup for cairo with method 'pkg-config' failed".
+        pkg-config \
+        libcairo2-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
@@ -45,7 +51,12 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        # Runtime cairo shared lib for the pycairo .so the builder
+        # baked into /opt/venv. Without it `import cairo` (transitive
+        # of xhtml2pdf) fails with ImportError at first PDF render.
+        libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root user; data dir owned by the same uid so the bind-mount on
