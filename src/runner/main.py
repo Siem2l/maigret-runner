@@ -141,6 +141,25 @@ async def api_json(job_id: str) -> Response:
     return Response(content=body, media_type="application/json")
 
 
+@app.get("/api/scans/{job_id}/pdf")
+async def api_pdf(job_id: str) -> Response:
+    """Stream the PDF report. Returns 404 if the scan didn't produce
+    one (PDF rendering is best-effort and can fail mid-render on a
+    site's escaped markup -- the scan's HTML report stays the canonical
+    artifact in that case)."""
+    row = await storage.get_job(job_id)
+    if row is None or not row.get("pdf_key"):
+        raise HTTPException(status_code=404, detail="pdf not available")
+    body = storage.get_object_bytes(row["pdf_key"])
+    return Response(
+        content=body,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{row["username"]}-{job_id[:8]}.pdf"',
+        },
+    )
+
+
 # ── Ops endpoints ────────────────────────────────────────────────────────
 
 

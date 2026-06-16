@@ -59,7 +59,7 @@ async def _run(job_id: str, username: str) -> None:
     started = time.monotonic()
     await storage.mark_running(job_id)
     try:
-        html, results = await _run_maigret(username)
+        html, pdf, results = await _run_maigret(username)
         sites_checked = len(results)
         sites_found = sum(1 for site_data in results.values() if _is_hit(site_data))
         html_key = storage.put_html(job_id, html)
@@ -67,7 +67,14 @@ async def _run(job_id: str, username: str) -> None:
             job_id,
             {"username": username, "results": _trim_results(results)},
         )
-        await storage.mark_done(job_id, sites_checked, sites_found, html_key, json_key)
+        # PDF is best-effort: xhtml2pdf can choke on individual sites'
+        # markup and raise mid-render. Skip the PDF (None key) on
+        # failure so the scan still completes -- the HTML report is
+        # the canonical artifact.
+        pdf_key = storage.put_pdf(job_id, pdf) if pdf is not None else None
+        await storage.mark_done(
+            job_id, sites_checked, sites_found, html_key, json_key, pdf_key
+        )
         SITES_FOUND.observe(sites_found)
         log.info(
             "scan done id=%s user=%s checked=%d found=%d",
@@ -85,15 +92,19 @@ async def _run(job_id: str, username: str) -> None:
         _TASKS.pop(job_id, None)
 
 
-async def _run_maigret(username: str) -> tuple[bytes, dict[str, Any]]:
-    """Invoke Maigret as a library and return (html_bytes, results_dict).
+async def _run_maigret(username: str) -> tuple[bytes, bytes | None, dict[str, Any]]:
+    """Invoke Maigret as a library and return (html_bytes, pdf_bytes, results).
 
     The public scan function in upstream Maigret is `maigret.maigret.maigret`
     (async), NOT `search` -- the CLI's `main()` calls it as
     `await maigret(...)` and accumulates results into a list of
     `(username, id_type, results)` tuples before passing them to
-    `generate_report_context` + `save_html_report`. We replicate the
-    same shape for a single-username scan.
+    `generate_report_context` + `save_html_report` + `save_pdf_report`.
+    We replicate the same shape for a single-username scan.
+
+    PDF rendering is best-effort: xhtml2pdf occasionally raises on a
+    site's escaped markup. We log + return None so the scan still
+    completes with the HTML report intact.
     """
     # Lazy import: maigret pulls in a lot of stuff at module load
     # (aiohttp, mock_db, etc.) — keep the import out of cold-start path.
@@ -101,6 +112,7 @@ async def _run_maigret(username: str) -> tuple[bytes, dict[str, Any]]:
         generate_report_context,
         maigret as maigret_search,
         save_html_report,
+        save_pdf_report,
     )
     from maigret.sites import MaigretDatabase  # type: ignore[import-not-found]
     import logging as _logging
@@ -130,10 +142,21 @@ async def _run_maigret(username: str) -> tuple[bytes, dict[str, Any]]:
     # tuples even when there's only one username -- mirrors how main()
     # accumulates them (maigret.py:855).
     context = generate_report_context([(username, "username", results)])
-    with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmp:
-        save_html_report(tmp.name, context)
-        html_bytes = Path(tmp.name).read_bytes()
-    return html_bytes, results
+
+    with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmp_html:
+        save_html_report(tmp_html.name, context)
+        html_bytes = Path(tmp_html.name).read_bytes()
+
+    pdf_bytes: bytes | None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_pdf:
+            save_pdf_report(tmp_pdf.name, context)
+            pdf_bytes = Path(tmp_pdf.name).read_bytes()
+    except Exception as exc:  # noqa: BLE001 — PDF is opportunistic, never block the scan
+        log.warning("PDF render failed (HTML still saved): %s", exc)
+        pdf_bytes = None
+
+    return html_bytes, pdf_bytes, results
 
 
 def _resolve_sites_db_path() -> str:

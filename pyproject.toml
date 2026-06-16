@@ -1,6 +1,6 @@
 [project]
 name = "maigret-runner"
-version = "0.1.3"
+version = "0.1.4"
 description = "A small self-hosted web app wrapping Maigret with FlareSolverr-backed fetches and Garage S3 report storage."
 readme = "README.md"
 license = { text = "MIT" }
@@ -18,6 +18,10 @@ dependencies = [
   "python-multipart>=0.0.12",
   "prometheus-client>=0.21",
   "maigret>=0.5.0",
+  # Pulls in xhtml2pdf + reportlab so Maigret's save_pdf_report() works.
+  # Listed explicitly (rather than via `maigret[pdf]`) so dep resolution
+  # stays predictable across maigret version bumps.
+  "xhtml2pdf>=0.2.16",
 ]
 
 [project.optional-dependencies]

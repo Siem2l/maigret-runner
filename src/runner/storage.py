@@ -34,9 +34,13 @@ CREATE TABLE IF NOT EXISTS jobs (
     sites_found     INTEGER NOT NULL DEFAULT 0,
     error           TEXT,
     html_key        TEXT,
-    json_key        TEXT
+    json_key        TEXT,
+    pdf_key         TEXT
 );
 CREATE INDEX IF NOT EXISTS jobs_started_at ON jobs(started_at DESC);
+-- Idempotent migration for DBs that pre-date the pdf_key column.
+-- ALTER TABLE ADD COLUMN fails if the column already exists; suppress
+-- via the SQLite error code we get back (handled in init_db).
 """
 
 
@@ -47,6 +51,13 @@ def _db_path() -> str:
 async def init_db() -> None:
     async with aiosqlite.connect(_db_path()) as db:
         await db.executescript(_SCHEMA)
+        # Backfill pdf_key on DBs created before v0.1.4. SQLite raises
+        # a generic OperationalError ("duplicate column name") when the
+        # column already exists -- silently ignored.
+        try:
+            await db.execute("ALTER TABLE jobs ADD COLUMN pdf_key TEXT")
+        except Exception:
+            pass
         await db.commit()
 
 
@@ -72,6 +83,7 @@ async def mark_done(
     sites_found: int,
     html_key: str | None,
     json_key: str | None,
+    pdf_key: str | None = None,
 ) -> None:
     now = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(_db_path()) as db:
@@ -82,9 +94,10 @@ async def mark_done(
                       sites_checked=?,
                       sites_found=?,
                       html_key=?,
-                      json_key=?
+                      json_key=?,
+                      pdf_key=?
                 WHERE id=?""",
-            (now, sites_checked, sites_found, html_key, json_key, job_id),
+            (now, sites_checked, sites_found, html_key, json_key, pdf_key, job_id),
         )
         await db.commit()
 
@@ -144,6 +157,18 @@ def put_html(job_id: str, html: bytes) -> str:
         Key=key,
         Body=html,
         ContentType="text/html; charset=utf-8",
+    )
+    return key
+
+
+def put_pdf(job_id: str, pdf: bytes) -> str:
+    key = f"{job_id}/report.pdf"
+    s3 = _s3_client()
+    s3.put_object(
+        Bucket=settings.s3_bucket,
+        Key=key,
+        Body=pdf,
+        ContentType="application/pdf",
     )
     return key
 
